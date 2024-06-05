@@ -5686,15 +5686,20 @@ export function getCropPopup(src) {
 }
 
 export function genImgProxyUrl(originUrl) {
-    // start with '/'
-    let fullUrl = "http://10.1.3.24:5100";
+    // // startswith /thumnail, only get the file=$1 argument to filename
+    // let filename = '';
+    // let fullUrl = "local://home/"
+    // // startswith /thumnail, only get the file=$1 argument to filename
+    // if (originUrl.startsWith('/thumnail')) {
+    //     const match = originUrl.match(/file=(\w+)/);
+    //     if (match) filename = match[1];
+    //     else originUrl;
+    // } else {
+    // }
 
-    if (originUrl.startsWith('/'))
-        fullUrl += originUrl;
-    else
-        fullUrl += '/' + originUrl;
+    // return `https://img.iscys.com/enc/${btoa(filename)}`;
 
-    return `https://img.iscys.com/enc/${btoa(fullUrl)}`;
+    return originUrl;
 }
 
 export function getThumbnailUrl(type, file) {
