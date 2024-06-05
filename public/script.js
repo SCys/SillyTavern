@@ -5687,7 +5687,7 @@ export function getCropPopup(src) {
 
 export function genImgProxyUrl(originUrl) {
     // start with '/'
-    let fullUrl = "http://10.1.3.10:5111";
+    let fullUrl = "http://10.1.3.24:5100";
 
     if (originUrl.startsWith('/'))
         fullUrl += originUrl;
