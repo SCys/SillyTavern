@@ -5686,7 +5686,7 @@ export function getCropPopup(src) {
 }
 
 function genImgProxyUrl(originUrl) {
-    const fullUrl = btoa('http://10.1.3.26:3201' + originUrl);
+    const fullUrl = btoa('http://10.1.3.10:5111' + originUrl);
     return `https://img.iscys.com/enc/${fullUrl}`;
 }
 
