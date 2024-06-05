@@ -5695,7 +5695,7 @@ export function genImgProxyUrl(originUrl) {
         const file = urlParams.get('file');
 
         if(type == 'avatar')
-            fullUrl += `thumbnails/avatar/${file}`;
+            fullUrl += `thumbnails/avatar/${encodeURIComponent(file)}`;
         else
             return originUrl;
     } else if (originUrl.startsWith('User Avatars/')) { // `User%20Avatars/1717468247236-JackS.png`
