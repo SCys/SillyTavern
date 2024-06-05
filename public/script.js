@@ -5689,23 +5689,19 @@ export function genImgProxyUrl(originUrl) {
     let fullUrl = "local:///sillytavern/"
 
 
-    if (originUrl.startsWith('/thumnail')) { // originUrl is `/thumbnail?type=avatar&file=丽娇.png`
+    if (originUrl.startsWith('/thumbnail?')) { // originUrl is `/thumbnail?type=avatar&file=丽娇.png`
         const urlParams = new URLSearchParams(originUrl.slice(originUrl.indexOf('?') + 1));
         const type = urlParams.get('type');
         const file = urlParams.get('file');
 
-        switch(type) {
-            case 'avatar':
-                fullUrl += `thumbnails/avatar/${file}`;
-                break;
-
-            default:
-                return originUrl;
-        }
+        if(type=='avatar')
+            fullUrl += `thumbnails/avatar/${file}`;
+        else
+            return originUrl;
     } else if (originUrl.startsWith('User Avatars/')) { // `User%20Avatars/1717468247236-JackS.png`
         fullUrl += originUrl
-    }
-
+    } else
+        return originUrl;
 
     console.info("origin to imgproxy", originUrl, fullUrl, btoa(fullUrl));
     return `https://img.iscys.com/enc/${btoa(fullUrl)}`;
