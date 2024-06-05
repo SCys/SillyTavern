@@ -5688,9 +5688,9 @@ export function getCropPopup(src) {
 export function genImgProxyUrl(originUrl) {
     let fullUrl = "local:///sillytavern/"
 
-    // `/thumbnail?type=avatar&file=丽娇.png`
-    if (originUrl.startsWith('/thumnail')) {
-        const urlParams = new URLSearchParams(originUrl);
+
+    if (originUrl.startsWith('/thumnail')) { // originUrl is `/thumbnail?type=avatar&file=丽娇.png`
+        const urlParams = new URLSearchParams(originUrl.slice(originUrl.indexOf('?') + 1));
         const type = urlParams.get('type');
         const file = urlParams.get('file');
 
