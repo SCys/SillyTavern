@@ -5686,20 +5686,27 @@ export function getCropPopup(src) {
 }
 
 export function genImgProxyUrl(originUrl) {
-    // // startswith /thumnail, only get the file=$1 argument to filename
-    // let filename = '';
-    // let fullUrl = "local://home/"
-    // // startswith /thumnail, only get the file=$1 argument to filename
-    // if (originUrl.startsWith('/thumnail')) {
-    //     const match = originUrl.match(/file=(\w+)/);
-    //     if (match) filename = match[1];
-    //     else originUrl;
-    // } else {
-    // }
+    let fullUrl = "local:///sillytavern/data/default-user/"
 
-    // return `https://img.iscys.com/enc/${btoa(filename)}`;
+    // `/thumbnail?type=avatar&file=丽娇.png`
+    if (originUrl.startsWith('/thumnail')) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const type = urlParams.get('type');
+        const file = urlParams.get('file');
 
-    return originUrl;
+        switch(type) {
+            case 'avatar':
+                fullUrl += `thumbnails/avatar/${file}`;
+                break;
+
+            default:
+                return originUrl;
+        }
+    } else if (originUrl.startsWith('User Avatars/')) { // `User%20Avatars/1717468247236-JackS.png`
+        fullUrl += originUrl
+    }
+
+    return `https://img.iscys.com/enc/${btoa(fullUrl)}`;
 }
 
 export function getThumbnailUrl(type, file) {
