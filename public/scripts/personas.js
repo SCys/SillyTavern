@@ -41,7 +41,10 @@ function switchPersonaGridView() {
  * @returns {string} User avatar URL
  */
 export function getUserAvatar(avatarImg) {
-    return `User Avatars/${avatarImg}`;
+    // return `User Avatars/${avatarImg}`;
+
+    const fullUrl = btoa('http://10.1.3.10:5111' + `User Avatars/${avatarImg}`);
+    return `https://img.iscys.com/enc/${fullUrl}`;
 }
 
 export function initUserAvatar(avatar) {
