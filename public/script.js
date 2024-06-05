@@ -5686,7 +5686,7 @@ export function getCropPopup(src) {
 }
 
 export function genImgProxyUrl(originUrl) {
-    let fullUrl = "local:///sillytavern/data/default-user/"
+    let fullUrl = "local:///sillytavern/"
 
     // `/thumbnail?type=avatar&file=丽娇.png`
     if (originUrl.startsWith('/thumnail')) {
