@@ -17,6 +17,7 @@ import {
     saveSettingsDebounced,
     setUserName,
     this_chid,
+    genImgProxyUrl,
 } from '../script.js';
 import { persona_description_positions, power_user } from './power-user.js';
 import { getTokenCountAsync } from './tokenizers.js';
@@ -41,10 +42,7 @@ function switchPersonaGridView() {
  * @returns {string} User avatar URL
  */
 export function getUserAvatar(avatarImg) {
-    // return `User Avatars/${avatarImg}`;
-
-    const fullUrl = btoa('http://10.1.3.10:5111' + `User Avatars/${avatarImg}`);
-    return `https://img.iscys.com/enc/${fullUrl}`;
+    return genImgProxyUrl(`User Avatars/${avatarImg}`);
 }
 
 export function initUserAvatar(avatar) {
