@@ -5690,7 +5690,7 @@ export function genImgProxyUrl(originUrl) {
 
     // `/thumbnail?type=avatar&file=丽娇.png`
     if (originUrl.startsWith('/thumnail')) {
-        const urlParams = new URLSearchParams(window.location.search);
+        const urlParams = new URLSearchParams(originUrl);
         const type = urlParams.get('type');
         const file = urlParams.get('file');
 
