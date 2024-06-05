@@ -5706,6 +5706,8 @@ export function genImgProxyUrl(originUrl) {
         fullUrl += originUrl
     }
 
+
+    console.info("origin to imgproxy", originUrl, fullUrl, btoa(fullUrl));
     return `https://img.iscys.com/enc/${btoa(fullUrl)}`;
 }
 
