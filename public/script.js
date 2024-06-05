@@ -5685,8 +5685,13 @@ export function getCropPopup(src) {
             </div>`;
 }
 
+function genImgProxyUrl(originUrl) {
+    const fullUrl = btoa('http://10.1.3.26:3201' + originUrl);
+    return `https://img.iscys.com/enc/${fullUrl}`;
+}
+
 export function getThumbnailUrl(type, file) {
-    return `/thumbnail?type=${type}&file=${encodeURIComponent(file)}`;
+    return genImgProxyUrl(`/thumbnail?type=${type}&file=${encodeURIComponent(file)}`);
 }
 
 export function buildAvatarList(block, entities, { templateId = 'inline_avatar_template', empty = true, selectable = false, highlightFavs = true } = {}) {
