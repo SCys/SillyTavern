@@ -5869,7 +5869,6 @@ export function getCropPopup(src) {
 export function genImgProxyUrl(originUrl) {
     let fullUrl = "local:///sillytavern/"
 
-
     if (originUrl.startsWith('/thumbnail?')) { // originUrl is "/thumbnail?type=avatar&file=丽娇.png"
         const urlParams = new URLSearchParams(originUrl.slice(originUrl.indexOf('?') + 1));
         const type = urlParams.get('type');
@@ -5884,7 +5883,7 @@ export function genImgProxyUrl(originUrl) {
     } else
         return originUrl;
 
-    // console.info("origin to imgproxy", originUrl, fullUrl, btoa(fullUrl));
+    console.info("origin to imgproxy", originUrl, fullUrl, btoa(fullUrl));
     return `https://img.iscys.com/enc/${btoa(fullUrl)}`;
 }
 
