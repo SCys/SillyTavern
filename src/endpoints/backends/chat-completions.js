@@ -1064,6 +1064,13 @@ router.post('/generate', jsonParser, function (request, response) {
                 await handleErrorResponse(fetchResponse);
             }
         } catch (error) {
+            // Handle aborted requests
+            if (error.type === 'aborted') {
+                console.log('Request was aborted');
+                response.status(400).send({ error: 'Request was aborted' });
+                return;
+            }
+
             console.log('Generation failed', error);
             const message = error.code === 'ECONNREFUSED'
                 ? `Connection refused: ${error.message}`
