@@ -1026,7 +1026,7 @@ router.post('/generate', jsonParser, function (request, response) {
         signal: controller.signal,
     };
 
-    console.log(requestBody);
+    // console.log(requestBody);
 
     makeRequest(config, response, request);
 
