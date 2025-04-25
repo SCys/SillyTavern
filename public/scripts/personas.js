@@ -112,6 +112,7 @@ export function setUserAvatar(imgfile, { toastPersonaNameChange = true, navigate
     reloadUserAvatar();
     updatePersonaUIStates({ navigateToCurrent: navigateToCurrent });
     selectCurrentPersona({ toastPersonaNameChange: toastPersonaNameChange });
+    retriggerFirstMessageOnEmptyChat();
     saveSettingsDebounced();
     $('.zoomed_avatar[forchar]').remove();
 }
@@ -466,7 +467,7 @@ export function initPersona(avatarId, personaName, personaDescription) {
  * @returns {Promise<boolean>} A promise that resolves to true if the character was converted, false otherwise.
  */
 export async function convertCharacterToPersona(characterId = null) {
-    if (null === characterId) characterId = this_chid;
+    if (null === characterId) characterId = Number(this_chid);
 
     const avatarUrl = characters[characterId]?.avatar;
     if (!avatarUrl) {
@@ -801,7 +802,7 @@ async function selectCurrentPersona({ toastPersonaNameChange = true } = {}) {
             chat_metadata['persona'] = user_avatar;
             console.log(`Auto locked persona to ${user_avatar}`);
             if (toastPersonaNameChange && power_user.persona_show_notifications) {
-                toastr.success(`Persona ${personaName} selected and auto-locked to current chat`, t`Persona Selected`);
+                toastr.success(t`Persona ${personaName} selected and auto-locked to current chat`, t`Persona Selected`);
             }
             saveMetadataDebounced();
             updatePersonaUIStates();
@@ -1244,7 +1245,7 @@ function getPersonaStates(avatarId) {
     /** @type {PersonaConnection[]} */
     const connections = power_user.persona_descriptions[avatarId]?.connections;
     const hasCharLock = !!connections?.some(c =>
-        (!selected_group && c.type === 'character' && c.id === characters[this_chid]?.avatar)
+        (!selected_group && c.type === 'character' && c.id === characters[Number(this_chid)]?.avatar)
         || (selected_group && c.type === 'group' && c.id === selected_group));
 
     return {
@@ -1482,7 +1483,7 @@ async function loadPersonaForCurrentChat({ doRender = false } = {}) {
  * @returns {string[]} - An array of persona keys that are connected to the given character key
  */
 export function getConnectedPersonas(characterKey = undefined) {
-    characterKey ??= selected_group || characters[this_chid]?.avatar;
+    characterKey ??= selected_group || characters[Number(this_chid)]?.avatar;
     const connectedPersonas = Object.entries(power_user.persona_descriptions)
         .filter(([_, desc]) => desc.connections?.some(conn => conn.type === 'character' && conn.id === characterKey))
         .map(([key, _]) => key);
@@ -1514,7 +1515,7 @@ export async function showCharConnections() {
                 console.log(`Unlocking persona ${personaId} from current character ${name2}`);
                 power_user.persona_descriptions[personaId].connections = connections.filter(c => {
                     if (menu_type == 'group_edit' && c.type == 'group' && c.id == selected_group) return false;
-                    else if (c.type == 'character' && c.id == characters[this_chid]?.avatar) return false;
+                    else if (c.type == 'character' && c.id == characters[Number(this_chid)]?.avatar) return false;
                     return true;
                 });
                 saveSettingsDebounced();
@@ -1546,8 +1547,8 @@ export async function showCharConnections() {
 export function getCurrentConnectionObj() {
     if (selected_group)
         return { type: 'group', id: selected_group };
-    if (characters[this_chid]?.avatar)
-        return { type: 'character', id: characters[this_chid]?.avatar };
+    if (characters[Number(this_chid)]?.avatar)
+        return { type: 'character', id: characters[Number(this_chid)]?.avatar };
     return null;
 }
 
@@ -1665,7 +1666,7 @@ async function syncUserNameToPersona() {
  * Only works if only the first message is present, and not in group mode.
  */
 export function retriggerFirstMessageOnEmptyChat() {
-    if (this_chid >= 0 && !selected_group && chat.length === 1) {
+    if (Number(this_chid) >= 0 && !selected_group && chat.length === 1) {
         $('#firstmessage_textarea').trigger('input');
     }
 }
@@ -1783,7 +1784,6 @@ function setNameCallback({ mode = 'all' }, name) {
         if (!persona) persona = Object.entries(power_user.personas).find(([_, personaName]) => personaName.toLowerCase() === name.toLowerCase())?.[1];
         if (persona) {
             autoSelectPersona(persona);
-            retriggerFirstMessageOnEmptyChat();
             return '';
         } else if (mode === 'lookup') {
             toastr.warning(`Persona ${name} not found`);
@@ -1794,7 +1794,6 @@ function setNameCallback({ mode = 'all' }, name) {
     if (['temp', 'all'].includes(mode)) {
         // Otherwise, set just the name
         setUserName(name); //this prevented quickReply usage
-        retriggerFirstMessageOnEmptyChat();
     }
 
     return '';
@@ -1945,9 +1944,6 @@ export async function initPersonas() {
     $(document).on('click', '#user_avatar_block .avatar-container', function () {
         const imgfile = $(this).attr('data-avatar-id');
         setUserAvatar(imgfile);
-
-        // force firstMes {{user}} update on persona switch
-        retriggerFirstMessageOnEmptyChat();
     });
 
     $('#persona_rename_button').on('click', () => renamePersona(user_avatar));
@@ -1980,4 +1976,3 @@ export async function initPersonas() {
     eventSource.on(event_types.CHAT_CHANGED, loadPersonaForCurrentChat);
     switchPersonaGridView();
 }
-
