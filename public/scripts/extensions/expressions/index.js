@@ -1,10 +1,10 @@
 import { Fuse } from '../../../lib.js';
 
-import { characters, eventSource, event_types, generateRaw, getRequestHeaders, main_api, online_status, saveSettingsDebounced, substituteParams, substituteParamsExtended, system_message_types, this_chid } from '../../../script.js';
+import { characters, eventSource, event_types, generateQuietPrompt, generateRaw, getRequestHeaders, online_status, saveSettingsDebounced, substituteParams, substituteParamsExtended, system_message_types, this_chid } from '../../../script.js';
 import { dragElement, isMobile } from '../../RossAscends-mods.js';
 import { getContext, getApiUrl, modules, extension_settings, ModuleWorkerWrapper, doExtrasFetch, renderExtensionTemplateAsync } from '../../extensions.js';
 import { loadMovingUIState, performFuzzySearch, power_user } from '../../power-user.js';
-import { onlyUnique, debounce, getCharaFilename, trimToEndSentence, trimToStartSentence, waitUntilCondition, findChar, isFalseBoolean } from '../../utils.js';
+import { onlyUnique, debounce, getCharaFilename, trimToEndSentence, trimToStartSentence, waitUntilCondition, findChar, isFalseBoolean, includesIgnoreCaseAndAccents } from '../../utils.js';
 import { hideMutedSprites, selected_group } from '../../group-chats.js';
 import { isJsonSchemaSupported } from '../../textgen-settings.js';
 import { debounce_timeout } from '../../constants.js';
@@ -84,6 +84,12 @@ const EXPRESSION_API = {
     llm: 2,
     webllm: 3,
     none: 99,
+};
+
+/** @enum {string} */
+const PROMPT_TYPE = {
+    raw: 'raw',
+    full: 'full',
 };
 
 let expressionsList = null;
@@ -357,8 +363,7 @@ export async function visualNovelUpdateLayers(container) {
             if (power_user.reduced_motion) {
                 element.css('left', currentPosition + 'px');
                 requestAnimationFrame(() => resolve());
-            }
-            else {
+            } else {
                 element.animate({ left: currentPosition + 'px' }, 500, () => {
                     resolve();
                 });
@@ -519,8 +524,7 @@ async function moduleWorker({ newChat = false } = {}) {
         }
 
         return;
-    }
-    else {
+    } else {
         // force reload expressions list on connect to API
         if (offlineMode.is(':visible')) {
             expressionsList = null;
@@ -593,11 +597,9 @@ async function moduleWorker({ newChat = false } = {}) {
         }
 
         await sendExpressionCall(spriteFolderName, expression, { force: force, vnMode: vnMode });
-    }
-    catch (error) {
+    } catch (error) {
         console.log(error);
-    }
-    finally {
+    } finally {
         inApiCall = false;
         lastCharacter = context.groupId || context.characterId;
         lastMessage = currentLastMessage.mes;
@@ -625,8 +627,7 @@ function getFolderNameByMessage(message) {
 
     if (context.groupId) {
         avatarPath = message.original_avatar || context.characters.find(x => message.force_avatar && message.force_avatar.includes(encodeURIComponent(x.avatar)))?.avatar;
-    }
-    else if (context.characterId !== undefined) {
+    } else if (context.characterId !== undefined) {
         avatarPath = getCharaFilename();
     }
 
@@ -661,7 +662,14 @@ export async function sendExpressionCall(spriteFolderName, expression, { force =
     }
 }
 
-async function setSpriteFolderCommand(_, folder) {
+/**
+ * Slash command callback for /setspritefolder
+ * @param {object} param Command parameters
+ * @param {string} param.name Character name override
+ * @param {string} folder Folder path, can be full or partial with leading slash
+ * @returns {Promise<string>} Empty string
+ */
+async function setSpriteFolderCommand({ name }, folder) {
     if (!folder) {
         console.log('Clearing sprite set');
         folder = '';
@@ -669,8 +677,12 @@ async function setSpriteFolderCommand(_, folder) {
 
     if (folder.startsWith('/') || folder.startsWith('\\')) {
         const currentLastMessage = getLastCharacterMessage();
+        if (currentLastMessage.name === null && !name) {
+            toastr.error('At least one character message is required to set a sprites subfolder.', 'Provide the name with "name=" argument.');
+            return '';
+        }
         folder = folder.slice(1);
-        folder = `${currentLastMessage.name}/${folder}`;
+        folder = `${name || currentLastMessage.name}/${folder}`;
     }
 
     $('#expression_override').val(folder.trim());
@@ -772,6 +784,32 @@ async function setSpriteSlashCommand({ type }, searchTerm) {
     await sendExpressionCall(spriteFolderName, label, { force: true, overrideSpriteFile: spriteFile });
 
     return label;
+}
+
+/**
+ * @param {string} expressionName - Label of the expression to set as fallback
+ */
+function setFallBackExpressionSlashCommand(args, expressionName) {
+    expressionName = expressionName.trim().toLowerCase();
+
+    if (!expressionName) return extension_settings?.expressions?.fallback_expression || '';
+
+    const select = /** @type {HTMLSelectElement} */(document.getElementById('expression_fallback'));
+    const fallbackExpressions = Array
+        .from(select?.options || [])
+        .map(option => option.value)
+        .filter(expression => expression?.length > 0);
+
+    const expressionMatch = fallbackExpressions.find(expression => includesIgnoreCaseAndAccents(expression, expressionName));
+
+    if (!expressionMatch) {
+        toastr.warning(t`No expression found for search term ${expressionName}`, t`Set Fallback Expression`);
+        return '';
+    }
+
+    $(select).val(expressionMatch).trigger('change');
+
+    return expressionMatch;
 }
 
 /**
@@ -909,10 +947,6 @@ function sampleClassifyText(text) {
  * @returns {Promise<string>} Prompt for the LLM API.
  */
 async function getLlmPrompt(labels) {
-    if (isJsonSchemaSupported()) {
-        return '';
-    }
-
     const labelsString = labels.map(x => `"${x}"`).join(', ');
     const prompt = substituteParamsExtended(String(extension_settings.expressions.llmPrompt), { labels: labelsString });
     return prompt;
@@ -976,6 +1010,7 @@ function getJsonSchema(emotions) {
         required: [
             'emotion',
         ],
+        additionalProperties: false,
     };
 }
 
@@ -1047,7 +1082,21 @@ export async function getExpressionLabel(text, expressionsApi = extension_settin
                 const expressionsList = await getExpressionsList({ filterAvailable: filterAvailable });
                 const prompt = substituteParamsExtended(customPrompt, { labels: expressionsList }) || await getLlmPrompt(expressionsList);
                 eventSource.once(event_types.TEXT_COMPLETION_SETTINGS_READY, onTextGenSettingsReady);
-                const emotionResponse = await generateRaw(text, main_api, false, false, prompt);
+
+                let emotionResponse;
+                try {
+                    inApiCall = true;
+                    switch (extension_settings.expressions.promptType) {
+                        case PROMPT_TYPE.raw:
+                            emotionResponse = await generateRaw({ prompt: text, systemPrompt: prompt });
+                            break;
+                        case PROMPT_TYPE.full:
+                            emotionResponse = await generateQuietPrompt({ quietPrompt: prompt });
+                            break;
+                    }
+                } finally {
+                    inApiCall = false;
+                }
                 return parseLlmResponse(emotionResponse, expressionsList);
             }
             // Using WebLLM
@@ -1275,8 +1324,7 @@ async function getSpritesList(name) {
         }
 
         return grouped;
-    }
-    catch (err) {
+    } catch (err) {
         console.log(err);
         return [];
     }
@@ -1314,7 +1362,7 @@ async function renderFallbackExpressionPicker() {
     defaultPicker.empty();
 
 
-    addOption(OPTION_NO_FALLBACK, '[ No fallback ]', !extension_settings.expressions.fallback_expression);
+    addOption(OPTION_NO_FALLBACK, '[ No fallback ]', !extension_settings.expressions.fallback_expression && !extension_settings.expressions.showDefault);
     addOption(OPTION_EMOJI_FALLBACK, '[ Default emojis ]', !!extension_settings.expressions.showDefault);
 
     for (const expression of expressions) {
@@ -1386,7 +1434,6 @@ export async function getExpressionsList({ filterAvailable = false } = {}) {
                 });
 
                 if (apiResult.ok) {
-
                     const data = await apiResult.json();
                     expressionsList = data.labels;
                     return expressionsList;
@@ -1397,7 +1444,7 @@ export async function getExpressionsList({ filterAvailable = false } = {}) {
             if (extension_settings.expressions.api == EXPRESSION_API.local) {
                 const apiResult = await fetch('/api/extra/classify/labels', {
                     method: 'POST',
-                    headers: getRequestHeaders(),
+                    headers: getRequestHeaders({ omitContentType: true }),
                 });
 
                 if (apiResult.ok) {
@@ -1449,9 +1496,8 @@ function chooseSpriteForExpression(spriteFolderName, expression, { prevExpressio
         const searched = sprite.files.find(x => x.fileName === overrideSpriteFile);
         if (searched) spriteFile = searched;
         else toastr.warning(t`Couldn't find sprite file ${overrideSpriteFile} for expression ${expression}.`, t`Sprite Not Found`);
-    }
-    // Else calculate next expression, if multiple are allowed
-    else if (extension_settings.expressions.allowMultiple && sprite.files.length > 1) {
+    } else if (extension_settings.expressions.allowMultiple && sprite.files.length > 1) {
+        // Else calculate next expression, if multiple are allowed
         let possibleFiles = sprite.files;
         if (extension_settings.expressions.rerollIfSame) {
             possibleFiles = possibleFiles.filter(x => !prevExpressionSrc || x.imageSrc !== prevExpressionSrc);
@@ -1460,7 +1506,6 @@ function chooseSpriteForExpression(spriteFolderName, expression, { prevExpressio
     }
 
     return spriteFile;
-
 }
 
 /**
@@ -1567,8 +1612,7 @@ async function setExpression(spriteFolderName, expression, { force = false, over
         }
 
         console.info('Expression set', { expression: spriteFile.expression, file: spriteFile.fileName });
-    }
-    else {
+    } else {
         img.attr('data-sprite-folder-name', spriteFolderName);
 
         img.off('error');
@@ -1702,6 +1746,7 @@ function onExpressionApiChanged() {
     if (tempApi) {
         extension_settings.expressions.api = Number(tempApi);
         $('.expression_llm_prompt_block').toggle([EXPRESSION_API.llm, EXPRESSION_API.webllm].includes(extension_settings.expressions.api));
+        $('.expression_prompt_type_block').toggle(extension_settings.expressions.api === EXPRESSION_API.llm);
         expressionsList = null;
         spriteCache = {};
         moduleWorker();
@@ -1740,27 +1785,38 @@ async function onExpressionFallbackChanged() {
     saveSettingsDebounced();
 }
 
+/**
+ * Handles the file upload process for a sprite image.
+ * @param {string} url URL to upload the file to
+ * @param {FormData} formData FormData object containing the file and other data to upload
+ * @returns {Promise<any>} - The response data from the server
+ */
 async function handleFileUpload(url, formData) {
     try {
-        const data = await jQuery.ajax({
-            type: 'POST',
-            url: url,
-            data: formData,
-            beforeSend: function () { },
-            cache: false,
-            contentType: false,
-            processData: false,
+        const result = await fetch(url, {
+            method: 'POST',
+            headers: getRequestHeaders({ omitContentType: true }),
+            body: formData,
+            cache: 'no-cache',
         });
 
+        if (!result.ok) {
+            throw new Error(`Upload failed with status ${result.status}`);
+        }
+
+        const data = await result.json();
+
         // Refresh sprites list
-        const name = formData.get('name');
+        const name = formData.get('name').toString();
         delete spriteCache[name];
         await fetchImagesNoCache();
         await validateImages(name);
 
-        return data;
+        return data ?? {};
     } catch (error) {
+        console.error('Error uploading image:', error);
         toastr.error('Failed to upload image');
+        return {};
     }
 }
 
@@ -1806,19 +1862,16 @@ async function onClickExpressionUpload(event) {
             const fileNameWithoutExtension = withoutExtension(file.name);
             const validFileName = validateExpressionSpriteName(expression, fileNameWithoutExtension);
 
-            // If there is no expression yet and it's a valid expression, we just take it
             if (!clickedFileName && validFileName) {
+                // If there is no expression yet and it's a valid expression, we just take it
                 spriteName = fileNameWithoutExtension;
-            }
-            // If the filename matches the one that was clicked, we just take it and replace it
-            else if (clickedFileName === file.name) {
+            } else if (clickedFileName === file.name) {
+                // If the filename matches the one that was clicked, we just take it and replace it
                 spriteName = fileNameWithoutExtension;
-            }
-            // If it's a valid filename and there's no existing file with the same name, we just take it
-            else if (!matchesExisting && validFileName) {
+            } else if (!matchesExisting && validFileName) {
+                // If it's a valid filename and there's no existing file with the same name, we just take it
                 spriteName = fileNameWithoutExtension;
-            }
-            else {
+            } else {
                 /** @type {import('../../popup.js').CustomPopupButton[]} */
                 const customButtons = [];
                 if (clickedFileName) {
@@ -1978,7 +2031,11 @@ async function onClickExpressionUploadPackButton() {
         const uploadToast = toastr.info('Please wait...', 'Upload is processing', { timeOut: 0, extendedTimeOut: 0 });
         const { count } = await handleFileUpload('/api/sprites/upload-zip', formData);
         toastr.clear(uploadToast);
-        toastr.success(`Uploaded ${count} image(s) for ${name}`);
+
+        // Only show success message if at least one image was uploaded
+        if (count) {
+            toastr.success(`Uploaded ${count} image(s) for ${name}`);
+        }
 
         // Reset the input
         e.target.form.reset();
@@ -2098,13 +2155,18 @@ function migrateSettings() {
         saveSettingsDebounced();
     }
 
-    if (extension_settings.expressions.showDefault && extension_settings.expressions.fallback_expression !== undefined) {
+    if (extension_settings.expressions.showDefault && extension_settings.expressions.fallback_expression) {
         extension_settings.expressions.showDefault = false;
+        saveSettingsDebounced();
+    }
+
+    if (extension_settings.expressions.promptType === undefined) {
+        extension_settings.expressions.promptType = PROMPT_TYPE.raw;
         saveSettingsDebounced();
     }
 }
 
-(async function () {
+export async function init() {
     function addExpressionImage() {
         const html = `
         <div id="expression-wrapper">
@@ -2169,6 +2231,16 @@ function migrateSettings() {
             extension_settings.expressions.llmPrompt = DEFAULT_LLM_PROMPT;
             saveSettingsDebounced();
         });
+        $('#expression_prompt_raw').on('input', function () {
+            extension_settings.expressions.promptType = PROMPT_TYPE.raw;
+            saveSettingsDebounced();
+        });
+        $('#expression_prompt_full').on('input', function () {
+            extension_settings.expressions.promptType = PROMPT_TYPE.full;
+            saveSettingsDebounced();
+        });
+        $(`input[name="expression_prompt_type"][value="${extension_settings.expressions.promptType}"]`).prop('checked', true);
+        $('.expression_prompt_type_block').toggle(extension_settings.expressions.api === EXPRESSION_API.llm);
 
         $('#expression_custom_add').on('click', onClickExpressionAddCustom);
         $('#expression_custom_remove').on('click', onClickExpressionRemoveCustom);
@@ -2271,9 +2343,55 @@ function migrateSettings() {
         returns: 'The currently set expression label after setting it.',
     }));
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'expression-fallback',
+        callback: setFallBackExpressionSlashCommand,
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'expression label to set',
+                typeList: [ARGUMENT_TYPE.STRING],
+                isRequired: false,
+                enumProvider: () => [
+                    new SlashCommandEnumValue('#none', 'Sets the fallback expression to no image'),
+                    new SlashCommandEnumValue('#emoji', 'Sets the fallback expression to emojis'),
+                    ...localEnumProviders.expressions(),
+                ],
+            }),
+        ],
+        helpString: `
+            <div>
+                Gets the currently selected expression fallback for all characters.<br />
+                If a valid expression label is sent, it will be set as the new fallback.
+            </div>
+            <div>
+                <strong>Example:</strong>
+                <ul>
+                    <li>
+                        <pre><code>/expression-fallback | /echo</code></pre>
+                        <small>Returns the currently selected fallback.</small>
+                    </li>
+                    <li>
+                        <pre><code>/expression-fallback admiration</code></pre>
+                        <small>Sets a new expression as fallback.</small>
+                    </li>
+                </ul>
+            </div>
+        `,
+        returns: 'The currently set expression label after setting it.',
+    }));
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'expression-folder-override',
         aliases: ['spriteoverride', 'costume'],
         callback: setSpriteFolderCommand,
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'name',
+                description: 'Character name to set a subfolder for. If not provided, the character who last sent a message will be used.',
+                typeList: [ARGUMENT_TYPE.STRING],
+                enumProvider: commonEnumProviders.characters('character'),
+                isRequired: false,
+                acceptsMultiple: false,
+            }),
+        ],
         unnamedArgumentList: [
             new SlashCommandArgument(
                 'optional folder', [ARGUMENT_TYPE.STRING], false,
@@ -2455,4 +2573,4 @@ function migrateSettings() {
             </div>
         `,
     }));
-})();
+}

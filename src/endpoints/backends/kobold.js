@@ -76,7 +76,7 @@ router.post('/generate', async function (request, response_generate) {
             sampler_seed: request.body.sampler_seed,
         };
         if (request.body.stop_sequence) {
-            this_settings['stop_sequence'] = request.body.stop_sequence;
+            this_settings.stop_sequence = request.body.stop_sequence;
         }
     }
 
@@ -99,7 +99,7 @@ router.post('/generate', async function (request, response_generate) {
 
             if (request.body.streaming) {
                 // Pipe remote SSE stream to Express response
-                forwardFetchResponse(response, response_generate);
+                await forwardFetchResponse(response, response_generate);
                 return;
             } else {
                 if (!response.ok) {
@@ -204,7 +204,7 @@ router.post('/transcribe-audio', async function (request, response) {
         console.debug('Transcribing audio with KoboldCpp', server);
 
         const fileBase64 = fs.readFileSync(request.file.path).toString('base64');
-        fs.rmSync(request.file.path);
+        fs.unlinkSync(request.file.path);
 
         const headers = {};
         setAdditionalHeadersByType(headers, TEXTGEN_TYPES.KOBOLDCPP, server, request.user.directories);
